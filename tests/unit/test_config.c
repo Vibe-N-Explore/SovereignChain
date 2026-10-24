@@ -248,6 +248,50 @@ static void test_node_cannot_claim_role(void)
                          sizeof err) != SC_OK);
 }
 
+/* ---------------- Phase 3: pubkey in network.conf ---------------- */
+
+/* A valid 64-char hex pubkey (all-zero bytes, just for parsing tests). */
+#define ZERO_PUBKEY \
+    "0000000000000000000000000000000000000000000000000000000000000000"
+
+static void test_network_pubkey_field(void)
+{
+    network_config_t net;
+    char err[256] = "";
+    uint8_t zero[32];
+    memset(zero, 0, sizeof zero);
+
+    /* 5-field (no pubkey): backwards-compatible — has_pubkey == false */
+    CHECK(load_net_text(GOOD_NET, &net, err, sizeof err) == SC_OK);
+    CHECK(!net.nodes[0].has_pubkey);
+
+    /* 6-field with valid hex pubkey: has_pubkey == true, value matches */
+    const char *with_key =
+        "node 0 validator 127.0.0.1 9000 " ZERO_PUBKEY "\n"
+        "node 1 validator 127.0.0.1 9001 " ZERO_PUBKEY "\n"
+        "node 2 normal    127.0.0.1 9002 " ZERO_PUBKEY "\n"
+        "node 3 normal    127.0.0.1 9003 " ZERO_PUBKEY "\n"
+        "node 4 normal    127.0.0.1 9004 " ZERO_PUBKEY "\n"
+        "node 5 normal    127.0.0.1 9005 " ZERO_PUBKEY "\n";
+    CHECK(load_net_text(with_key, &net, err, sizeof err) == SC_OK);
+    CHECK(net.nodes[0].has_pubkey);
+    CHECK(memcmp(net.nodes[0].pubkey, zero, 32) == 0);
+
+    /* Bad hex pubkey (too short) */
+    CHECK(load_net_text("node 0 validator 127.0.0.1 9000 abc\n"
+                        "node 1 validator 127.0.0.1 9001\n"
+                        "node 2 normal 127.0.0.1 9002\n"
+                        "node 3 normal 127.0.0.1 9003\n"
+                        "node 4 normal 127.0.0.1 9004\n"
+                        "node 5 normal 127.0.0.1 9005\n",
+                        &net, err, sizeof err) == SC_ERR_PARSE);
+    CHECK_CONTAINS(err, "invalid pubkey_hex");
+
+    /* 7-field (too many tokens) */
+    CHECK(load_net_text("node 0 normal 127.0.0.1 9000 " ZERO_PUBKEY " extra\n",
+                        &net, err, sizeof err) == SC_ERR_PARSE);
+}
+
 /* ---------------- role gating & topology ---------------- */
 
 static void test_role_gating(void)
@@ -306,5 +350,6 @@ int main(void)
     RUN(test_node_cannot_claim_role);
     RUN(test_role_gating);
     RUN(test_topology);
+    RUN(test_network_pubkey_field);   /* Phase 3 */
     return TEST_SUMMARY();
 }
