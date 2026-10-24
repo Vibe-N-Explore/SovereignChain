@@ -8,6 +8,32 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Hex decode helper (mirrors crypto.c; we don't depend on crypto here to
+ * keep config.c a pure-C, no-OpenSSL dependency). */
+static bool hex_decode_pubkey(const char *hex,
+                              uint8_t out[SC_ED25519_PUBKEY_LEN])
+{
+    if (!hex || strlen(hex) != SC_ED25519_PUBKEY_LEN * 2)
+        return false;
+    for (size_t i = 0; i < SC_ED25519_PUBKEY_LEN; i++) {
+        unsigned int hi, lo;
+        char ch = hex[i * 2], cl = hex[i * 2 + 1];
+
+        if      (ch >= '0' && ch <= '9') hi = (unsigned)(ch - '0');
+        else if (ch >= 'a' && ch <= 'f') hi = (unsigned)(ch - 'a' + 10);
+        else if (ch >= 'A' && ch <= 'F') hi = (unsigned)(ch - 'A' + 10);
+        else return false;
+
+        if      (cl >= '0' && cl <= '9') lo = (unsigned)(cl - '0');
+        else if (cl >= 'a' && cl <= 'f') lo = (unsigned)(cl - 'a' + 10);
+        else if (cl >= 'A' && cl <= 'F') lo = (unsigned)(cl - 'A' + 10);
+        else return false;
+
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return true;
+}
+
 #define LINE_MAX_LEN 256
 
 /* ------------------------------------------------------------------ */
@@ -116,7 +142,7 @@ static sc_err_t parse_network_line(char *content, const char *path, int lineno,
                                    network_config_t *out, char *errbuf,
                                    size_t errlen)
 {
-    char *tok[6];
+    char *tok[7];   /* up to 7 tokens; 6th is optional pubkey hex */
     char *save = NULL;
     int nt = 0;
     long id, port;
@@ -126,15 +152,18 @@ static sc_err_t parse_network_line(char *content, const char *path, int lineno,
 
     for (char *t = strtok_r(content, " \t", &save); t;
          t = strtok_r(NULL, " \t", &save)) {
-        if (nt == 6) {
-            nt = 7; /* too many */
+        if (nt == 7) {
+            nt = 8; /* too many */
             break;
         }
         tok[nt++] = t;
     }
-    if (nt != 5 || strcmp(tok[0], "node") != 0) {
+    /* Accept 5 tokens (no pubkey, pre-Phase-3 format) OR
+     * 6 tokens (with pubkey, Phase-3+ format).
+     * A 7th+ token is a parse error. */
+    if ((nt != 5 && nt != 6) || strcmp(tok[0], "node") != 0) {
         set_err(errbuf, errlen,
-                "%s:%d: expected 'node <id> <validator|normal> <ipv4> <port>'",
+                "%s:%d: expected 'node <id> <validator|normal> <ipv4> <port> [<pubkey_hex>]'",
                 path, lineno);
         return SC_ERR_PARSE;
     }
@@ -168,10 +197,23 @@ static sc_err_t parse_network_line(char *content, const char *path, int lineno,
         return SC_ERR_INVALID;
     }
     ni = &out->nodes[out->count++];
-    ni->id = (int)id;
+    ni->id   = (int)id;
     ni->role = role;
     ni->port = (uint16_t)port;
     memcpy(ni->host, tok[3], strlen(tok[3]) + 1);
+
+    /* Parse optional 6th field: 64-char hex Ed25519 public key */
+    ni->has_pubkey = false;
+    if (nt == 6) {
+        if (!hex_decode_pubkey(tok[5], ni->pubkey)) {
+            set_err(errbuf, errlen,
+                    "%s:%d: invalid pubkey_hex (need 64 lowercase hex chars)",
+                    path, lineno);
+            return SC_ERR_PARSE;
+        }
+        ni->has_pubkey = true;
+    }
+
     return SC_OK;
 }
 
