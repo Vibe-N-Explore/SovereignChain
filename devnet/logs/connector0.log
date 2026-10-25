@@ -1,0 +1,9 @@
+ts=1792876161.360 level=info module=main node=0 msg=starting_connector id=0 port=8000
+ts=1792876161.456 level=info module=main node=0 msg=http_api_listening host=127.0.0.1 port=8080
+ts=1792876161.498 level=info module=main node=0 msg=connector_ready
+ts=1792876161.501 level=info module=cn_net node=0 msg=peer_disconnected peer=2 reason="poll error"
+ts=1792876161.508 level=info module=cn_chain node=0 msg=connected_to_chain chain=0 node_id=2
+ts=1792876161.511 level=info module=cn_chain node=0 msg=connected_to_chain chain=1 node_id=2
+ts=1792876161.534 level=info module=cn_net node=0 msg=peer_authenticated peer=1 dir=outbound
+ts=1792876162.545 level=info module=cn_net node=0 msg=peer_authenticated peer=2 dir=outbound
+ts=1792876410.086 level=info module=main node=0 msg=shutting_down

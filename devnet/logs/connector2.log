@@ -1,0 +1,8 @@
+ts=1792876161.405 level=info module=main node=2 msg=starting_connector id=2 port=8002
+ts=1792876161.536 level=info module=main node=2 msg=http_api_listening host=127.0.0.1 port=8082
+ts=1792876161.538 level=info module=main node=2 msg=connector_ready
+ts=1792876161.550 level=info module=cn_chain node=2 msg=connected_to_chain chain=0 node_id=4
+ts=1792876161.551 level=info module=cn_chain node=2 msg=connected_to_chain chain=1 node_id=4
+ts=1792876162.565 level=info module=cn_net node=2 msg=peer_authenticated peer=0 dir=inbound
+ts=1792876162.587 level=info module=cn_net node=2 msg=peer_authenticated peer=1 dir=inbound
+ts=1792876410.067 level=info module=main node=2 msg=shutting_down
