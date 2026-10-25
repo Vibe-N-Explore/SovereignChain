@@ -36,8 +36,6 @@ This repository contains two related systems:
 -   [Configuration and persistence](#configuration-and-persistence)
 -   [Transaction and transfer
     lifecycle](#transaction-and-transfer-lifecycle)
--   [Security model and known
-    limitations](#security-model-and-known-limitations)
 -   [Troubleshooting](#troubleshooting)
 -   [Development notes](#development-notes)
 
@@ -506,77 +504,6 @@ data before manually deleting it or regenerating the devnet.
 Steps 7--8 require the correctness conditions described below; the
 current source does not yet enforce them safely.
 
-## Security model and known limitations
-
-This is a prototype. Do not use it to custody real assets or connect it
-to production networks.
-
-### Consensus limitations
-
--   The SPD setup has two validators and requires both for its 2-of-2
-    certification model. It is **not Byzantine fault tolerant**; the
-    project documentation characterizes it as `f = 0`.
--   Liveness can stop if either validator is unavailable.
--   Peer authentication is not the same as transport encryption. The
-    chain's existing root README also records handshake design issues:
-    raw-nonce signing without domain separation, an
-    asymmetric/replayable listener challenge, and no
-    authenticated/encrypted protection for post-handshake frames. Treat
-    those as unresolved until separately reviewed and fixed.
-
-### Cross-chain correctness gaps found in this archive
-
-These points are based on inspection of the source included in this ZIP,
-not just the older prose documentation:
-
-1.  **Destination recipient is currently wrong for an escrow-originated
-    transfer.** `cn_transfer_create()` copies `source_tx->recipient`
-    into the transfer's `recipient` field. A bridge-initiation
-    transaction is classified because that recipient equals the source
-    chain's bridge escrow public key. `submit_destination_tx()` then
-    uses `xfr->recipient` as the destination credit recipient. In this
-    path, that value is the escrow key, not the original user's
-    destination address. The transaction format shown in this code does
-    not provide a separate destination-recipient field for the bridge
-    request.
-2.  **Completion is not tied to the destination transaction's
-    certificate.** `on_chain_cert()` iterates over transfers in
-    `DESTINATION_SUBMITTED` and marks them `COMPLETED` without matching
-    the certificate to `dest_tx_hash` or proving that the relevant
-    destination transaction was committed.
-3.  **Connector quorum is approval, not destination finality.** The
-    devnet test checks that an A-to-B transfer reaches connector quorum.
-    That check alone does not prove a correct recipient credit,
-    exactly-once execution, or destination-chain finality.
-4.  **The existing docs are inconsistent with the source.**
-    `docs/DEVNET.md` and `scripts/test_devnet.sh` contain older
-    statements about missing vertex proposals; the source in this
-    archive now has `propose_vertex_if_needed()` and calls it from the
-    node loop. The destination-recipient and certificate-matching issues
-    above remain visible in the inspected source.
-
-These are substantive correctness issues, not just documentation gaps.
-They should be fixed and covered by end-to-end tests that check: the
-intended destination address, the actual destination transaction hash,
-certificate inclusion of that exact transaction, duplicate suppression
-across connectors/restarts, and before/after balances on both chains.
-
-### Other limitations
-
--   Connector threshold voting is a federated quorum mechanism, not a
-    general BFT consensus protocol.
--   Connectors observe chain-node messages and verify transaction
-    signatures; the architecture documentation says they do not maintain
-    an independent full-chain state trie.
--   Exchange rates use integer numerator/denominator arithmetic and
-    floor division; verify that configured rates and amounts match the
-    intended economic model.
--   The API is unauthenticated and should remain loopback-only unless a
-    suitable authentication and network-security layer is added.
--   The supplied `devnet/` contains development private keys. Regenerate
-    them and never reuse them for anything valuable.
--   The archive does not include the standalone dashboard frontend, if
-    one exists elsewhere in the project.
 
 ## Troubleshooting
 
@@ -637,8 +564,3 @@ gaps](#cross-chain-correctness-gaps-found-in-this-archive).
     files, logs, PIDs, and build artifacts. Include source,
     configuration templates, scripts, tests, and documentation instead.
 
-## License
-
-No license file was present in the supplied archive. Add a `LICENSE`
-file before distributing the project if you intend to grant others
-explicit reuse rights.
